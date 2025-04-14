@@ -13,10 +13,11 @@ def angulo_ackermann(delta, v2):
     v1 = ((np.tan(a) * 28.15) / (89 + (np.tan(a) * 28.15))) * v2
     return b, v1
 
-def find_look_ahead_point(x, y, waypoints, idx_current, Ld):
+def find_look_ahead_point(x, y, waypoints, idx_current, Ld,piedras =None):
     """
     Busca el siguiente punto de seguimiento (look-ahead point) a lo largo de la trayectoria.
     """
+    
     N = waypoints.shape[0]
     lx = waypoints[-1, 0]
     ly = waypoints[-1, 1]
@@ -49,3 +50,30 @@ def find_look_ahead_point(x, y, waypoints, idx_current, Ld):
             break
 
     return lx, ly, idx_next
+
+def generar_ruta_prioritaria(piedras_lista):
+    piedras = piedras_lista
+    puntos_establecidos = ListQueueSimple()
+    waypoints = []
+
+    # Waypoints originales
+    waypoints_array = np.array([
+        [1.295, 1.5], [1.295, 6.5], [3.777, 6.5],
+        [3.777, 1.5], [6.475, 1.5], [6.475, 6.5],
+        [9.065, 6.5], [9.065, 1.5], [1.295, 1.5]
+    ])
+    for punto in waypoints_array:
+        puntos_establecidos.enqueue(punto)
+
+    # Bucle principal de decisión de waypoint
+    while not puntos_establecidos.isempty() or not piedras.isempty():
+        if not piedras.isempty():
+            punto = piedras.dequeue()
+            rospy.loginfo("Tomando prioridad: piedra detectada en {}".format(punto))
+        elif not puntos_establecidos.isempty():
+            punto = puntos_establecidos.dequeue()
+            rospy.loginfo("Siguiendo ruta establecida hacia {}".format(punto))
+
+        waypoints.append(punto)
+
+    return waypoints

@@ -62,3 +62,12 @@ class VESCRPMListener:
             # Use the most recent rpm_value here
             rospy.loginfo("Current RPM: %d", self.rpm_value)
             rate.sleep()
+
+class CoordinatesListener:
+    def __init__(self):
+        self.rock_coords = []
+        rospy.Subscriber("obstacle_coordinates", Point, self.callback)
+
+    def callback(self, msg):
+        coord = (msg.x, msg.y)
+        self.rock_coords.append(coord)

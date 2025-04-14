@@ -6,9 +6,10 @@ import tf.transformations as tft
 from tu_paquete.msg import WheelInfo
 
 # Importación de módulos propios
-from controller import angulo_ackermann, find_look_ahead_point
-from ekf import compute_F, predict_state
-from utils import get_imu_data, compute_quaternion, realSpeedSetter, VESCRPMListener, IMUListener
+from controller import angulo_ackermann, find_look_ahead_point, generar_ruta_prioritaria
+from efk import compute_F, predict_state
+from utils import get_imu_data, compute_quaternion, VESCRPMListener, IMUListener,CoordinatesListener
+
 
 def main():
     rospy.init_node("odometry_node")
@@ -19,7 +20,6 @@ def main():
     dt = 0.05
     lookAheadDist = 1.5
     desiredSpeed = 0.4
-    realSpeed = realSpeedSetter()
 
     L = 0.89  # distancia entre ejes
     wheelDiameter = 0.24
@@ -31,7 +31,8 @@ def main():
         [3.777, 1.5], [6.475, 1.5], [6.475, 6.5],
         [9.065, 6.5], [9.065, 1.5], [1.295, 1.5]
     ])
-
+    
+    
     # Estado inicial estimado
     odom_x = 0.0
     odom_y = 0.0
@@ -46,12 +47,16 @@ def main():
 
     rpm_listener = VESCRPMListener()
     imu_listener = IMUListener()
+    coordenadas_camara = CoordinatesListener()
 
     while not rospy.is_shutdown():
         if idxWaypoint >= len(waypoints) - 1:
             rospy.loginfo("Último waypoint alcanzado.")
             break
-
+        
+        piedras = coordenadas_camara.get_new_coords()
+        waypoints_list = generar_ruta_prioritaria(piedras)
+        waypoints = np.array(waypoints_list)
         # Cálculo del punto de seguimiento
         lookX, lookY, idxWaypoint = find_look_ahead_point(odom_x, odom_y, waypoints, idxWaypoint, lookAheadDist)
 
@@ -77,7 +82,7 @@ def main():
             odom_x,
             odom_y,
             odom_theta,
-            realSpeed + imu_data['accel_filtered']['x'],
+            real_velocity + imu_data['accel_filtered']['x'],
             imu_data['gyro_filtered']['z']
         ]) + noise
 

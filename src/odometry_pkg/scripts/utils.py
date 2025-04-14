@@ -4,6 +4,44 @@ import rospy
 import tf.transformations as tft
 from std_msgs.msg import Int32
 from std_msgs.msg import Float32
+from geometry_msgs.msg import Point
+from threading import Lock
+
+class ListQueueSimple:
+    """
+    A thread-safe queue for storing items (e.g., 2D coordinates) with FIFO behavior.
+    Supports enqueue, dequeue, isempty, and push_front for prioritization.
+    """
+    def __init__(self):
+        self.items = []
+        self.lock = Lock()
+
+    def enqueue(self, item):
+        """Add an item to the tail of the queue."""
+        with self.lock:
+            self.items.append(item)
+
+    def push_front(self, item):
+        """Add an item to the head of the queue (for prioritization)."""
+        with self.lock:
+            self.items.insert(0, item)
+
+    def dequeue(self):
+        """Remove and return an item from the head of the queue."""
+        with self.lock:
+            if self.items:
+                return self.items.pop(0)
+            return None
+
+    def isempty(self):
+        """Check if the queue is empty."""
+        with self.lock:
+            return len(self.items) == 0
+
+    def size(self):
+        """Return the number of items in the queue."""
+        with self.lock:
+            return len(self.items)
 
 class IMUListener:
     def _init_(self):
@@ -62,12 +100,16 @@ class VESCRPMListener:
             # Use the most recent rpm_value here
             rospy.loginfo("Current RPM: %d", self.rpm_value)
             rate.sleep()
+  # Assume this is your queue implementation
 
 class CoordinatesListener:
     def __init__(self):
-        self.rock_coords = []
+        self.rock_coords = ListQueueSimple()
         rospy.Subscriber("obstacle_coordinates", Point, self.callback)
 
     def callback(self, msg):
-        coord = (msg.x, msg.y)
-        self.rock_coords.append(coord)
+        coord = [msg.x, msg.y]  # Use list for compatibility with waypoints
+        self.rock_coords.enqueue(coord)  # Or push_front(coord) for newest-first priority
+
+    def get_new_coords(self):
+        return self.rock_coords

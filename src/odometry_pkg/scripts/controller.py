@@ -1,5 +1,7 @@
 # controller.py
 import numpy as np
+from utils import ListQueueSimple 
+import rospy
 
 def angulo_ackermann(delta, v2):
     """
@@ -51,29 +53,48 @@ def find_look_ahead_point(x, y, waypoints, idx_current, Ld,piedras =None):
 
     return lx, ly, idx_next
 
-def generar_ruta_prioritaria(piedras_lista):
-    piedras = piedras_lista
-    puntos_establecidos = ListQueueSimple()
-    waypoints = []
 
-    # Waypoints originales
-    waypoints_array = np.array([
-        [1.295, 1.5], [1.295, 6.5], [3.777, 6.5],
-        [3.777, 1.5], [6.475, 1.5], [6.475, 6.5],
-        [9.065, 6.5], [9.065, 1.5], [1.295, 1.5]
-    ])
-    for punto in waypoints_array:
-        puntos_establecidos.enqueue(punto)
+def generar_ruta_prioritaria(piedras_lista, use_push_front=False):
+    """
+    Get the next waypoint, prioritizing stones over predefined waypoints.
 
-    # Bucle principal de decisión de waypoint
-    while not puntos_establecidos.isempty() or not piedras.isempty():
-        if not piedras.isempty():
-            punto = piedras.dequeue()
-            rospy.loginfo("Tomando prioridad: piedra detectada en {}".format(punto))
-        elif not puntos_establecidos.isempty():
-            punto = puntos_establecidos.dequeue()
-            rospy.loginfo("Siguiendo ruta establecida hacia {}".format(punto))
+    Args:
+        piedras_lista: ListQueueSimple with stone coordinates.
+        use_push_front: If True, assumes stones are added with push_front.
 
-        waypoints.append(punto)
+    Returns:
+        list: Next waypoint ([x, y]) or None if no points remain.
+    """
+    # Persistent waypoints queue
+    if not hasattr(generar_ruta_prioritaria, 'puntos_establecidos'):
+        generar_ruta_prioritaria.puntos_establecidos = ListQueueSimple()
+        waypoints_array = np.array([
+            [1.295, 1.5], [1.295, 6.5], [3.777, 6.5],
+            [3.777, 1.5], [6.475, 1.5], [6.475, 6.5],
+            [9.065, 6.5], [9.065, 1.5], [1.295, 1.5]
+        ])
+        for punto in waypoints_array:
+            generar_ruta_prioritaria.puntos_establecidos.enqueue(punto.tolist())
 
-    return waypoints
+    # Get next point
+    try:
+        if not piedras_lista.isempty():
+            punto = piedras_lista.dequeue()
+            rospy.loginfo(f"Prioritizing detected stone at {punto}")
+        elif not generar_ruta_prioritaria.puntos_establecidos.isempty():
+            punto = generar_ruta_prioritaria.puntos_establecidos.dequeue()
+            rospy.loginfo(f"Following predefined waypoint at {punto}")
+        else:
+            rospy.loginfo("No points remain")
+            return None
+
+        # Validate point
+        if not isinstance(punto, (list, np.ndarray)) or len(punto) != 2:
+            rospy.logwarn(f"Invalid point: {punto}")
+            return None
+
+        return punto
+    except Exception as e:
+        rospy.logerr(f"Error processing point: {e}")
+        return None
+  

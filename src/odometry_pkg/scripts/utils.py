@@ -62,3 +62,33 @@ class VESCRPMListener:
             # Use the most recent rpm_value here
             rospy.loginfo("Current RPM: %d", self.rpm_value)
             rate.sleep()
+
+def initialize_serial(port, baud_rate, timeout):
+    """Inicializa la conexión serial y retorna el objeto serial."""
+    try:
+        ser = serial.Serial(
+            port=port,
+            baudrate=baud_rate,
+            timeout=timeout
+        )
+        print(f"Conectado al puerto {port} a {baud_rate} baudios.")
+        time.sleep(2)  # Espera para que Arduino se inicialice
+        return ser
+    except serial.SerialException as e:
+        print(f"Error al conectar al puerto {port}: {e}")
+        return None
+
+def send_rpm_command(ser, rpm1, rpm2, rpm3, rpm4):
+    """Envía una cadena con los RPM de las 4 llantas en el formato M1:rpm1;M2:rpm2;M3:rpm3;M4:rpm4\n."""
+    if ser is None or not ser.is_open:
+        print("Error: No hay conexión serial activa.")
+        return
+
+    # Formatear la cadena
+    command = f"M1:{rpm1};M2:{rpm2};M3:{rpm3};M4:{rpm4}\n"
+    try:
+        # Enviar la cadena codificada
+        ser.write(command.encode('utf-8'))
+        print(f"Enviado: {command.strip()}")
+    except serial.SerialException as e:
+        print(f"Error al enviar el comando: {e}")

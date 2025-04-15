@@ -6,6 +6,7 @@ from std_msgs.msg import Int32
 from std_msgs.msg import Float32
 from geometry_msgs.msg import Point
 from threading import Lock
+import time 
 
 class ListQueueSimple:
     """
@@ -44,15 +45,14 @@ class ListQueueSimple:
             return len(self.items)
 
 class IMUListener:
-    def _init_(self):
-        # Initialize storage for each IMU value
-        self.yaw = 0.0
-        self.pitch = 0.0
-        self.roll = 0.0
-        self.accel_filtered = {'x': 0.0, 'y': 0.0, 'z': 0.0}
-        self.gyro_filtered = {'x': 0.0, 'y': 0.0, 'z': 0.0}
+    def __init__(self, sync_obj):
+        self.sync = sync_obj
+        self.imu_data = {
+            'yaw': 0.0, 'pitch': 0.0, 'roll': 0.0,
+            'accel': {'x': 0.0, 'y': 0.0, 'z': 0.0},
+            'gyro': {'x': 0.0, 'y': 0.0, 'z': 0.0}
+        }
 
-        # Subscribe to each ROS topic published by the ESP32
         rospy.Subscriber("imu/yaw", Float32, self.yaw_callback)
         rospy.Subscriber("imu/pitch", Float32, self.pitch_callback)
         rospy.Subscriber("imu/roll", Float32, self.roll_callback)
@@ -65,42 +65,30 @@ class IMUListener:
         rospy.Subscriber("imu/gyro_y", Float32, self.gy_callback)
         rospy.Subscriber("imu/gyro_z", Float32, self.gz_callback)
 
-    # Callback functions for each topic
-    def yaw_callback(self, msg): self.yaw = msg.data
-    def pitch_callback(self, msg): self.pitch = msg.data
-    def roll_callback(self, msg): self.roll = msg.data
+    def yaw_callback(self, msg): self.imu_data['yaw'] = msg.data; self.sync.update_imu(self.imu_data.copy())
+    def pitch_callback(self, msg): self.imu_data['pitch'] = msg.data
+    def roll_callback(self, msg): self.imu_data['roll'] = msg.data
 
-    def ax_callback(self, msg): self.accel_filtered['x'] = msg.data
-    def ay_callback(self, msg): self.accel_filtered['y'] = msg.data
-    def az_callback(self, msg): self.accel_filtered['z'] = msg.data
+    def ax_callback(self, msg): self.imu_data['accel']['x'] = msg.data
+    def ay_callback(self, msg): self.imu_data['accel']['y'] = msg.data
+    def az_callback(self, msg): self.imu_data['accel']['z'] = msg.data
 
-    def gx_callback(self, msg): self.gyro_filtered['x'] = msg.data
-    def gy_callback(self, msg): self.gyro_filtered['y'] = msg.data
-    def gz_callback(self, msg): self.gyro_filtered['z'] = msg.data
+    def gx_callback(self, msg): self.imu_data['gyro']['x'] = msg.data
+    def gy_callback(self, msg): self.imu_data['gyro']['y'] = msg.data
+    def gz_callback(self, msg): self.imu_data['gyro']['z'] = msg.data
+
 
 def compute_quaternion(theta):
     return tft.quaternion_from_euler(0, 0, theta)
 
-class VESCRPMListener: 
-    def _init_(self):
-
-        # Variable to store the most recent RPM
-        self.rpm_value = 0
-
-        # Subscribe to the RPM topic
+class VESCRPMListener:
+    def __init__(self, sync_obj):
+        self.sync = sync_obj
         rospy.Subscriber("vesc/rpm", Int32, self.rpm_callback)
 
     def rpm_callback(self, msg):
-        self.rpm_value = msg.data  # Update the value
-        rospy.loginfo("Updated RPM: %d", self.rpm_value)
+        self.sync.update_rpm(msg.data)
 
-    def run(self):
-        rate = rospy.Rate(10)  # Loop at 10 Hz
-        while not rospy.is_shutdown():
-            # Use the most recent rpm_value here
-            rospy.loginfo("Current RPM: %d", self.rpm_value)
-            rate.sleep()
-  # Assume this is your queue implementation
 
 class CoordinatesListener:
     def __init__(self):
@@ -113,3 +101,28 @@ class CoordinatesListener:
 
     def get_new_coords(self):
         return self.rock_coords
+
+class SynchronizedData:
+    def __init__(self):
+        self.lock = Lock()
+        self.last_update_time = 0
+        self.imu_data = {}
+        self.rpm = 0
+
+    def update_imu(self, imu_dict):
+        with self.lock:
+            self.imu_data = imu_dict
+            self.last_update_time = time.time()
+
+    def update_rpm(self, rpm_value):
+        with self.lock:
+            self.rpm = rpm_value
+            self.last_update_time = time.time()
+
+    def get_latest_data(self):
+        with self.lock:
+            return {
+                'imu': self.imu_data,
+                'rpm': self.rpm,
+                'timestamp': self.last_update_time
+            }

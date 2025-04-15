@@ -4,7 +4,7 @@ from nav_msgs.msg import Odometry #Cambiar después
 from odometry.msg import WheelInfo #Cambiar después
 from controller import angulo_ackermann, find_look_ahead_point, generar_ruta_prioritaria
 from efk import compute_F, predict_state
-from utils import get_imu_data, compute_quaternion, VESCRPMListener, IMUListener, CoordinatesListener
+from utils import compute_quaternion, VESCRPMListener, IMUListener, CoordinatesListener, SynchronizedData
 
 def main():
     rospy.init_node("odometry_node")
@@ -30,9 +30,13 @@ def main():
 
     idxWaypoint = 0
     waypoints = []  # Dynamic waypoint list
-    rpm_listener = VESCRPMListener()
-    imu_listener = IMUListener()
     coordenadas_camara = CoordinatesListener()
+    
+    sync_data = SynchronizedData()
+    imu_listener = IMUListener(sync_data)
+    rpm_listener = VESCRPMListener(sync_data)
+
+    rate = rospy.Rate(10)
 
     while not rospy.is_shutdown():
         # Get next waypoint
@@ -76,10 +80,12 @@ def main():
         b, v_interior = angulo_ackermann(delta, desiredSpeed)
 
         # Sensor data
-        real_RPM = rpm_listener.rpm_value
+        # Get synchronized sensor data
+        sensor_data = sync_data.get_latest_data()
+        real_RPM = sensor_data['rpm']
+        imu_data = sensor_data['imu']
         real_velocity = (real_RPM / 60.0) * wheelCircumference
         RPM = (desiredSpeed / wheelCircumference) * 60
-        imu_data = get_imu_data()
 
         # Simulated measurement with noise
         noise = np.random.normal(0, np.sqrt(np.diag(R)))

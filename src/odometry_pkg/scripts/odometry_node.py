@@ -4,6 +4,7 @@ import numpy as np
 from nav_msgs.msg import Odometry
 import tf.transformations as tft
 from tu_paquete.msg import WheelInfo
+import tf
 
 # Importación de módulos propios
 from controller import angulo_ackermann, find_look_ahead_point
@@ -45,6 +46,8 @@ def main():
 
     rpm_listener = VESCRPMListener()
     imu_listener = IMUListener()
+
+    tf_broadcaster = tf.TransformBroadcaster() #Crea un objeto que se encarga de publicar transformaciones (Le agregue)
 
     while not rospy.is_shutdown():
         if idxWaypoint >= len(waypoints) - 1:
@@ -107,7 +110,8 @@ def main():
         # Preparar y publicar el mensaje de odometría
         odom_msg = Odometry()
         odom_msg.header.stamp = rospy.Time.now()
-        odom_msg.header.frame_id = "odom"
+        odom_msg.header.frame_id = "odom" #Referencia global
+        odom_msg.child_frame_id = "base_link" #Frame del robot
         odom_msg.pose.pose.position.x = xhat[0]
         odom_msg.pose.pose.position.y = xhat[1]
         odom_msg.pose.pose.position.z = 0
@@ -119,6 +123,18 @@ def main():
         odom_msg.pose.pose.orientation.z = quaternion[2]
         odom_msg.pose.pose.orientation.w = quaternion[3]
 
+        #Publicar odom
+        odom_pub.publish(odom_msg)
+
+        #Publicar la transformacion t entre odom y base_link
+        tf_broadcaster.sendTransform(
+            (xhat[0], xhat[1], 0),
+            quaternion,
+            rospy.Time.now(),
+            "base_link", 
+            "odom"
+        )
+
         # Preparar y publicar el mensaje de los datos de las ruedas
         wheel_msg = WheelInfo()
         wheel_msg.v_interior = v_interior
@@ -126,7 +142,6 @@ def main():
         wheel_msg.delta = delta
         wheel_msg.beta = b
 
-        odom_pub.publish(odom_msg)
         wheel_pub.publish(wheel_msg)
         rate.sleep()
 

@@ -1,0 +1,25 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/andrea/catkin_ws/devel/include/**",
+        "/opt/ros/melodic/include/**",
+        "/home/andrea/robot_ws/src/src/hector_slam/hector_geotiff/include/**",
+        "/home/andrea/robot_ws/src/src/hector_slam/hector_map_tools/include/**",
+        "/home/andrea/robot_ws/src/src/hector_slam/hector_mapping/include/**",
+        "/home/andrea/robot_ws/src/src/hector_slam/hector_marker_drawing/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
